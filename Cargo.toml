@@ -1,0 +1,32 @@
+[package]
+name = "schematize-optimizer"
+version = "0.1.0"
+edition = "2021"
+description = "schematize Optimizer: deixa a máquina de dev previsível — mede o ambiente e põe build, navegador e container cada um no seu teto de recurso. Sugere por padrão; só muda o que sabe desfazer."
+license = "MIT"
+
+[lib]
+name = "optimizer"
+path = "src/lib.rs"
+
+# UM repo, DOIS binários (ADR-0010/0011) — a GUI virá aqui, não num repo à parte.
+[[bin]]
+name = "optimizer"
+path = "src/main.rs"
+
+[dependencies]
+clap = { version = "4", features = ["derive"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+# Só para devolver o SIGPIPE ao padrão do Unix — ver a nota em `main.rs`.
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
+
+# Perfil IDÊNTICO ao dos outros repos do app: o install.sh compila todos com um
+# `CARGO_TARGET_DIR` único, e cargo só reaproveita artefato se o perfil bater EXATAMENTE.
+# Qualquer divergência aqui parte o cache compartilhado.
+[profile.release]
+strip = true
+opt-level = 3
+lto = "thin"
