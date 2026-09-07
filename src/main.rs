@@ -26,8 +26,9 @@ fn main() {
     restaurar_sigpipe();
     let cli = Cli::parse();
     let r = match cli.cmd {
-        Cmd::Diag => cli::diag::diag_cmd(),
+        Cmd::Diag { aguardar } => cli::diag::diag_cmd(aguardar),
         Cmd::Caixas { aplicar, revert } => cli::caixas::caixas_cmd(aplicar, revert),
+        Cmd::Desktop { instalar, remover } => cli::diag::desktop_cmd(instalar, remover),
     };
     if let Err(e) = r {
         eprintln!("erro: {e}");

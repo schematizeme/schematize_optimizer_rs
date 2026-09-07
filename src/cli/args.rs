@@ -26,8 +26,13 @@ pub(crate) struct Cli {
 
 #[derive(Subcommand)]
 pub(crate) enum Cmd {
-    /// Mede a máquina e diz o que dá para melhorar. NÃO muda nada.
-    Diag,
+    /// Mede a máquina e diz o que dá para melhorar. NÃO muda nada. É o que o ícone abre.
+    Diag {
+        /// Espera uma tecla no fim. O lançador do desktop usa isto — sem ele o terminal
+        /// fecharia no mesmo instante e o clique pareceria não ter feito nada.
+        #[arg(long)]
+        aguardar: bool,
+    },
     /// Tetos de recurso por software (build, navegador, container), via systemd.
     Caixas {
         /// Grava os slices. Sem isto, só mostra o que faria.
@@ -36,5 +41,14 @@ pub(crate) enum Cmd {
         /// Apaga os slices que ESTA ferramenta gerou — e só eles.
         #[arg(long)]
         revert: bool,
+    },
+    /// Ícone e entrada no menu de aplicativos — para abrir o app sem o schematize.
+    Desktop {
+        /// Instala (padrão se nenhuma flag vier).
+        #[arg(long)]
+        instalar: bool,
+        /// Remove a entrada do menu.
+        #[arg(long)]
+        remover: bool,
     },
 }

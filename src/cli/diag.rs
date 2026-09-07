@@ -7,7 +7,7 @@ fn gib(b: u64) -> String {
     format!("{:.1} GB", b as f64 / 1_073_741_824.0)
 }
 
-pub(crate) fn diag_cmd() -> Result<(), String> {
+pub(crate) fn diag_cmd(aguardar: bool) -> Result<(), String> {
     let m = maquina::detectar();
     let g = gpu::detectar();
 
@@ -58,5 +58,44 @@ pub(crate) fn diag_cmd() -> Result<(), String> {
     } else {
         println!("  indisponível: cgroups v2 não está montado nesta máquina.");
     }
+
+    if !optimizer::nucleo::desktop::arquivo_desktop(&optimizer::nucleo::util::home()).exists() {
+        println!();
+        println!("  (este app ainda não está no seu menu de aplicativos:");
+        println!("   `optimizer desktop --instalar` põe o ícone lá)");
+    }
+
+    if aguardar {
+        // O lançador do desktop fecha o terminal quando o processo sai. Sem esta pausa, o
+        // clique no ícone seria um piscar.
+        println!();
+        print!("Enter para fechar… ");
+        use std::io::Write;
+        let _ = std::io::stdout().flush();
+        let mut l = String::new();
+        let _ = std::io::stdin().read_line(&mut l);
+    }
+    Ok(())
+}
+
+/// `optimizer desktop` — põe (ou tira) o app do menu de aplicativos.
+pub(crate) fn desktop_cmd(instalar: bool, remover: bool) -> Result<(), String> {
+    use optimizer::nucleo::desktop;
+    if instalar && remover {
+        return Err("`--instalar` e `--remover` são opostos — peça um de cada vez".into());
+    }
+    let home = optimizer::nucleo::util::home();
+    if remover {
+        let tinha = desktop::remover(&home)?;
+        println!("{}", if tinha { "removido do menu." } else { "não estava no menu." });
+        return Ok(());
+    }
+    // O caminho do PRÓPRIO executável: gravar um adivinhado faria o ícone abrir outra coisa
+    // (ou nada) em quem instalou fora do lugar padrão.
+    let bin = std::env::current_exe()
+        .map_err(|e| format!("não descobri o caminho do próprio binário: {e}"))?;
+    let p = desktop::instalar(&home, &bin)?;
+    println!("instalado: {}", p.display());
+    println!("O app agora aparece na lista de programas do sistema.");
     Ok(())
 }
