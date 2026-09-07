@@ -3,7 +3,7 @@
 //! **O quê:** cruza os serviços habilitados com o custo real de boot (`systemd-analyze
 //! blame`) e com uma allowlist **curta e justificada item a item**.
 //!
-//! **Onde:** `optimizer servicos`. Nunca aplica sozinho — o ADR-0011 reserva o `--aplicar`
+//! **Onde:** `optimizer services`. Nunca aplica sozinho — o ADR-0011 reserva o `--aplicar`
 //! automático às caixas, porque desabilitar serviço é onde se quebra máquina e a causa fica
 //! longe do sintoma ("fiquei sem áudio" três dias depois).
 //!
@@ -124,7 +124,7 @@ pub fn seguro_de(unidade: &str) -> Option<&'static Seguro> {
 
 /// **O quê:** junta habilitados + custo + allowlist. Função PURA.
 ///
-/// **Onde:** `optimizer servicos`. Ordena por custo decrescente: o que mais pesa aparece
+/// **Onde:** `optimizer services`. Ordena por custo decrescente: o que mais pesa aparece
 /// primeiro, porque é sobre ele que vale decidir.
 pub fn cruzar(habilitados: &[String], custos: &HashMap<String, f64>) -> Vec<Servico> {
     let mut v: Vec<Servico> = habilitados

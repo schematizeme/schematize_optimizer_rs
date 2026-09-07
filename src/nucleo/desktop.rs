@@ -3,7 +3,7 @@
 //! **O quê:** grava o `.desktop` e instala os ícones, para o app **aparecer na lista de
 //! programas** e abrir sozinho — sem passar pelo schematize.
 //!
-//! **Onde:** `optimizer desktop --instalar` / `--remover`, e o `install.sh` ao instalar o app.
+//! **Onde:** `optimizer desktop --install` / `--remover`, e o `install.sh` ao instalar o app.
 //!
 //! ## Por que o app instala a PRÓPRIA integração
 //!
@@ -42,7 +42,7 @@ pub fn render(bin: &Path, icone: &Path) -> String {
          Name=schematize Optimizer\n\
          GenericName=Recursos da máquina de dev\n\
          Comment=Mede o ambiente e põe cada software no seu teto de recurso\n\
-         Exec={} diag --aguardar\n\
+         Exec={} diag --wait\n\
          Icon={}\n\
          Terminal=true\n\
          Categories=Development;System;Settings;\n\
@@ -123,7 +123,7 @@ mod tests {
     fn abre_em_terminal_e_nao_fecha_na_cara() {
         let t = render(Path::new("/b/optimizer"), Path::new("/i/x.png"));
         assert!(t.contains("Terminal=true"), "CLI sem terminal não mostra nada");
-        assert!(t.contains("--aguardar"), "sem isto o terminal fecha antes de a pessoa ler");
+        assert!(t.contains("--wait"), "sem isto o terminal fecha antes de a pessoa ler");
     }
 
     /// O `.desktop` tem os campos que o menu exige — sem eles a entrada é ignorada em

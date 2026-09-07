@@ -1,4 +1,4 @@
-//! `optimizer servicos` — o que sobe no boot e o pouco que dá para desligar.
+//! `optimizer services` — o que sobe no boot e o pouco que dá para desligar.
 //!
 //! **Só relata.** Desabilitar serviço é onde se quebra máquina, e o ADR-0011 reserva o
 //! `--aplicar` automático às caixas. Aqui a ferramenta mostra, explica e **entrega o comando**

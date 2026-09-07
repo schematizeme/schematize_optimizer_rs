@@ -1,18 +1,18 @@
-//! `optimizer caixas` — mostra os tetos; aplica só com `--aplicar`.
+//! `optimizer limits` — mostra os tetos; aplica só com `--aplicar`.
 
 use optimizer::caixas::slice;
 use optimizer::diag::maquina;
 use optimizer::nucleo::util;
 
-pub(crate) fn caixas_cmd(aplicar: bool, revert: bool) -> Result<(), String> {
+pub(crate) fn caixas_cmd(apply: bool, revert: bool) -> Result<(), String> {
     let home = util::home();
 
     if revert {
         // O revert vem primeiro e sozinho: combinar `--revert` com `--aplicar` seria pedir
         // duas coisas opostas na mesma linha, e adivinhar qual vence é como se apaga o que
         // não se queria apagar.
-        if aplicar {
-            return Err("`--aplicar` e `--revert` são opostos — peça um de cada vez".into());
+        if apply {
+            return Err("`--apply` and `--revert` are opposites — ask for one at a time".into());
         }
         let apagados = slice::reverter(&home)?;
         if apagados.is_empty() {
@@ -58,11 +58,11 @@ pub(crate) fn caixas_cmd(aplicar: bool, revert: bool) -> Result<(), String> {
         println!();
     }
 
-    if !aplicar {
+    if !apply {
         println!("Nada foi alterado. Para aplicar:");
-        println!("    optimizer caixas --aplicar");
+        println!("    optimizer limits --apply");
         println!("E para desfazer, a qualquer momento:");
-        println!("    optimizer caixas --revert");
+        println!("    optimizer limits --revert");
         return Ok(());
     }
 
@@ -77,6 +77,6 @@ pub(crate) fn caixas_cmd(aplicar: bool, revert: bool) -> Result<(), String> {
     println!("Os tetos valem para o que for INICIADO dentro do slice. Ex.:");
     println!("    systemd-run --user --slice=dev-build.slice --scope cargo build");
     println!();
-    println!("Desfaz tudo com: optimizer caixas --revert");
+    println!("Desfaz tudo com: optimizer limits --revert");
     Ok(())
 }

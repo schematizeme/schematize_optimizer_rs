@@ -3,7 +3,7 @@
 //! **O quê:** gera *slices* de usuário (`~/.config/systemd/user/*.slice`) com limites de
 //! memória, CPU e IO, e sabe desfazê-los.
 //!
-//! **Onde:** `optimizer caixas`. É a única área que o `--aplicar` executa sozinho (ADR-0011),
+//! **Onde:** `optimizer limits`. É a única área que o `--aplicar` executa sozinho (ADR-0011),
 //! e a razão é o custo do erro: slice é reversível apagando um arquivo, não pede root nem
 //! reboot, e no pior caso um build fica mais lento.
 //!
@@ -44,7 +44,7 @@ pub struct Caixa {
 
 /// **O quê:** os perfis sugeridos para uma máquina com `ram_mib` de RAM e `nucleos` de CPU.
 ///
-/// **Onde:** `optimizer caixas --sugerir`. Função PURA — a regra é testável sem systemd.
+/// **Onde:** `optimizer limits`. Função PURA — a regra é testável sem systemd.
 ///
 /// **A regra, e o porquê de cada número:**
 ///
@@ -104,7 +104,7 @@ pub fn render(c: &Caixa) -> String {
     let mut s = String::new();
     s.push_str("# Gerado por `schematize optimizer` (ADR-0011). NÃO edite à mão:\n");
     s.push_str(
-        "# `optimizer caixas --revert` apaga este arquivo e devolve o sistema ao que era.\n",
+        "# `optimizer limits --revert` apaga este arquivo e devolve o sistema ao que era.\n",
     );
     s.push_str(&format!("# O quê: {}\n", c.descricao));
     s.push_str("#\n");
@@ -133,7 +133,7 @@ pub fn dir_slices(home: &Path) -> PathBuf {
 
 /// **O quê:** grava os slices. Devolve os caminhos escritos.
 ///
-/// **Onde:** `optimizer caixas --aplicar`.
+/// **Onde:** `optimizer limits --apply`.
 ///
 /// **Só escreve arquivo que ele mesmo gerou:** se já existe um `.slice` de mesmo nome SEM o
 /// cabeçalho desta ferramenta, ele é **preservado** e reportado. Sobrescrever configuração
@@ -171,7 +171,7 @@ pub fn nosso(conteudo: &str) -> bool {
 
 /// **O quê:** apaga os slices que ESTA ferramenta gerou, e só eles. Devolve o que apagou.
 ///
-/// **Onde:** `optimizer caixas --revert`.
+/// **Onde:** `optimizer limits --revert`.
 ///
 /// **Nunca apaga o que não reconhece.** Um `.slice` alheio com nome parecido fica onde está —
 /// e é por isso que [`aplicar`] se recusa a sobrescrever: as duas metades da mesma regra.

@@ -26,10 +26,10 @@ fn main() {
     restaurar_sigpipe();
     let cli = Cli::parse();
     let r = match cli.cmd {
-        Cmd::Diag { aguardar } => cli::diag::diag_cmd(aguardar),
-        Cmd::Caixas { aplicar, revert } => cli::caixas::caixas_cmd(aplicar, revert),
-        Cmd::Servicos => cli::servicos::servicos_cmd(),
-        Cmd::Desktop { instalar, remover } => cli::diag::desktop_cmd(instalar, remover),
+        Cmd::Diag { wait } => cli::diag::diag_cmd(wait),
+        Cmd::Limits { apply, revert } => cli::caixas::caixas_cmd(apply, revert),
+        Cmd::Services => cli::servicos::servicos_cmd(),
+        Cmd::Desktop { install, remove } => cli::diag::desktop_cmd(install, remove),
     };
     if let Err(e) = r {
         eprintln!("erro: {e}");

@@ -7,7 +7,7 @@ fn gib(b: u64) -> String {
     format!("{:.1} GB", b as f64 / 1_073_741_824.0)
 }
 
-pub(crate) fn diag_cmd(aguardar: bool) -> Result<(), String> {
+pub(crate) fn diag_cmd(wait: bool) -> Result<(), String> {
     let m = maquina::detectar();
     let g = gpu::detectar();
 
@@ -54,7 +54,7 @@ pub(crate) fn diag_cmd(aguardar: bool) -> Result<(), String> {
     println!("CAIXAS DE RECURSO");
     if cg {
         println!("  dá para pôr build, navegador e container cada um no seu teto.");
-        println!("  veja o que seria feito: `optimizer caixas`");
+        println!("  veja o que seria feito: `optimizer limits`");
     } else {
         println!("  indisponível: cgroups v2 não está montado nesta máquina.");
     }
@@ -62,10 +62,10 @@ pub(crate) fn diag_cmd(aguardar: bool) -> Result<(), String> {
     if !optimizer::nucleo::desktop::arquivo_desktop(&optimizer::nucleo::util::home()).exists() {
         println!();
         println!("  (este app ainda não está no seu menu de aplicativos:");
-        println!("   `optimizer desktop --instalar` põe o ícone lá)");
+        println!("   `optimizer desktop --install` põe o ícone lá)");
     }
 
-    if aguardar {
+    if wait {
         // O lançador do desktop fecha o terminal quando o processo sai. Sem esta pausa, o
         // clique no ícone seria um piscar.
         println!();
@@ -79,13 +79,13 @@ pub(crate) fn diag_cmd(aguardar: bool) -> Result<(), String> {
 }
 
 /// `optimizer desktop` — põe (ou tira) o app do menu de aplicativos.
-pub(crate) fn desktop_cmd(instalar: bool, remover: bool) -> Result<(), String> {
+pub(crate) fn desktop_cmd(install: bool, remove: bool) -> Result<(), String> {
     use optimizer::nucleo::desktop;
-    if instalar && remover {
-        return Err("`--instalar` e `--remover` são opostos — peça um de cada vez".into());
+    if install && remove {
+        return Err("`--install` and `--remove` are opposites — ask for one at a time".into());
     }
     let home = optimizer::nucleo::util::home();
-    if remover {
+    if remove {
         let tinha = desktop::remover(&home)?;
         println!("{}", if tinha { "removido do menu." } else { "não estava no menu." });
         return Ok(());
