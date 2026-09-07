@@ -28,6 +28,7 @@ fn main() {
     let r = match cli.cmd {
         Cmd::Diag { aguardar } => cli::diag::diag_cmd(aguardar),
         Cmd::Caixas { aplicar, revert } => cli::caixas::caixas_cmd(aplicar, revert),
+        Cmd::Servicos => cli::servicos::servicos_cmd(),
         Cmd::Desktop { instalar, remover } => cli::diag::desktop_cmd(instalar, remover),
     };
     if let Err(e) = r {

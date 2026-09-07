@@ -42,6 +42,8 @@ pub(crate) enum Cmd {
         #[arg(long)]
         revert: bool,
     },
+    /// O que sobe no boot, quanto custa, e o pouco que dá para desligar com segurança.
+    Servicos,
     /// Ícone e entrada no menu de aplicativos — para abrir o app sem o schematize.
     Desktop {
         /// Instala (padrão se nenhuma flag vier).

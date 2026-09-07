@@ -26,3 +26,4 @@
 pub mod caixas;
 pub mod diag;
 pub mod nucleo;
+pub mod servicos;

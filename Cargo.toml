@@ -1,6 +1,6 @@
 [package]
 name = "schematize-optimizer"
-version = "0.2.0"
+version = "0.3.0"
 edition = "2021"
 description = "schematize Optimizer: deixa a máquina de dev previsível — mede o ambiente e põe build, navegador e container cada um no seu teto de recurso. Sugere por padrão; só muda o que sabe desfazer."
 license = "MIT"
