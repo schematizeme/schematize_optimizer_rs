@@ -13,7 +13,7 @@ use clap::{Parser, Subcommand};
 /// `optimizer` — deixa a máquina de dev previsível.
 #[derive(Parser)]
 #[command(
-    name = "optimizer",
+    name = "schematize-optimizer",
     version,
     about = "schematize optimizer — measures the dev environment and caps each software",
     long_about = "Suggests by default. Only changes what it knows how to undo, and `--revert` undoes it.\n\

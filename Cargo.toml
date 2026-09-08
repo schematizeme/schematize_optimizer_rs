@@ -11,7 +11,7 @@ path = "src/lib.rs"
 
 # UM repo, DOIS binários (ADR-0010/0011) — a GUI virá aqui, não num repo à parte.
 [[bin]]
-name = "optimizer"
+name = "schematize-optimizer"
 path = "src/main.rs"
 
 [dependencies]

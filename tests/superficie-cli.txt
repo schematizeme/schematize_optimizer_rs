@@ -1,15 +1,15 @@
-CMD optimizer
+CMD schematize-optimizer
   SOBRE schematize optimizer — measures the dev environment and caps each software
-CMD optimizer desktop
+CMD schematize-optimizer desktop
   SOBRE Icon and application-menu entry — so the app opens without schematize
   ARG install              --install
   ARG remove               --remove
-CMD optimizer diag
+CMD schematize-optimizer diag
   SOBRE Measure the machine and say what can be improved. Changes NOTHING. This is what the icon opens
   ARG wait                 --wait
-CMD optimizer limits
+CMD schematize-optimizer limits
   SOBRE Per-software resource ceilings (build, browser, container), via systemd slices
   ARG apply                --apply
   ARG revert               --revert
-CMD optimizer services
+CMD schematize-optimizer services
   SOBRE What starts at boot, what it costs, and the little that is safe to turn off
