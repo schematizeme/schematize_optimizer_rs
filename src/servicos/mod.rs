@@ -31,6 +31,7 @@ use std::collections::HashMap;
 pub struct Seguro {
     pub unidade: &'static str,
     /// O que ele faz — para a pessoa decidir, não para se convencer.
+    /// CHAVE de catálogo (não prosa) — ver a nota em [`SEGUROS`].
     pub o_que_faz: &'static str,
     /// Por que dá para desligar numa máquina de dev.
     pub por_que_da: &'static str,
@@ -40,23 +41,23 @@ pub struct Seguro {
 }
 
 /// A allowlist. **Dois itens**, e a brevidade é deliberada — ver o topo do módulo.
+///
+/// **Os campos guardam CHAVE de catálogo, não prosa** (ADR-0014 D8). Antes eles carregavam o
+/// texto em português, e o relatório em inglês saía com três parágrafos em português no meio —
+/// a mesma inconsistência que o catálogo existe para acabar, um nível abaixo. A camada `cli`
+/// traduz na hora de imprimir.
 pub const SEGUROS: &[Seguro] = &[
     Seguro {
         unidade: "NetworkManager-wait-online.service",
-        o_que_faz: "segura o boot até a rede estar de pé",
-        por_que_da: "num desktop nada precisa de rede ANTES do login — quem precisa é \
-                     servidor com montagem de rede ou serviço que sobe junto. O desktop \
-                     conecta em segundo plano e o login não espera",
-        o_que_se_perde: "se você tem montagem NFS/SMB em /etc/fstab ou um serviço que exige \
-                         rede no boot, ele pode falhar na primeira tentativa",
+        o_que_faz: "svc.nm_wait.does",
+        por_que_da: "svc.nm_wait.why",
+        o_que_se_perde: "svc.nm_wait.lose",
     },
     Seguro {
         unidade: "appstream-sync-cache.service",
-        o_que_faz: "atualiza o cache de metadados da loja de aplicativos",
-        por_que_da: "é para a vitrine gráfica de programas. Quem instala por `zypper`/`apt` \
-                     no terminal nunca lê esse cache",
-        o_que_se_perde: "a loja de aplicativos pode mostrar catálogo desatualizado até você \
-                         atualizá-la manualmente",
+        o_que_faz: "svc.appstream.does",
+        por_que_da: "svc.appstream.why",
+        o_que_se_perde: "svc.appstream.lose",
     },
 ];
 
@@ -218,18 +219,51 @@ appstream-sync-cache.service       enabled enabled";
 
     /// **A allowlist é curta e cada item se defende.** Um item sem "o que se perde" é um item
     /// que ninguém auditou — e é assim que uma lista de otimização vira uma lista de estragos.
+    ///
+    /// **Os campos agora guardam CHAVE de catálogo (ADR-0014 D8), e o teste RESOLVE a chave
+    /// antes de medir.** Medir o tamanho da chave não diria nada — `svc.nm_wait.does` tem 17
+    /// caracteres e não é justificativa nenhuma.
+    ///
+    /// E a mudança deixou o teste MAIS forte, de graça: chave ausente do catálogo cai no
+    /// fallback "a própria chave", que é curta — então o mesmo `assert` que cobra prosa
+    /// suficiente passou a cobrar também que a tradução EXISTA. Antes, um item sem entrada no
+    /// catálogo seria invisível aqui.
     #[test]
     fn todo_item_da_allowlist_declara_o_que_se_perde() {
+        use crate::nucleo::i18n::t;
         assert!(SEGUROS.len() <= 5, "lista longa é lista que ninguém auditou: {}", SEGUROS.len());
         for s in SEGUROS {
             assert!(s.unidade.ends_with(".service"), "{}", s.unidade);
-            assert!(s.o_que_faz.len() > 20, "{}: o que faz é vago demais", s.unidade);
-            assert!(s.por_que_da.len() > 40, "{}: a justificativa é fraca", s.unidade);
+            let faz = t(s.o_que_faz);
+            let porque = t(s.por_que_da);
+            let perde = t(s.o_que_se_perde);
             assert!(
-                s.o_que_se_perde.len() > 30,
-                "{}: sem declarar o custo, o item não foi auditado",
+                faz.len() > 20,
+                "{}: o que faz é vago demais (ou a chave não existe)",
                 s.unidade
             );
+            assert!(
+                porque.len() > 40,
+                "{}: a justificativa é fraca (ou a chave não existe)",
+                s.unidade
+            );
+            assert!(
+                perde.len() > 30,
+                "{}: sem declarar o custo, o item não foi auditado (ou a chave não existe)",
+                s.unidade
+            );
+            // E a chave tem de ser CHAVE, não prosa esquecida na tabela.
+            for (campo, chave) in [
+                ("o_que_faz", s.o_que_faz),
+                ("por_que_da", s.por_que_da),
+                ("o_que_se_perde", s.o_que_se_perde),
+            ] {
+                assert!(
+                    chave.starts_with("svc.") && !chave.contains(' '),
+                    "{}: `{campo}` devia ser chave de catálogo, veio {chave:?}",
+                    s.unidade
+                );
+            }
         }
     }
 

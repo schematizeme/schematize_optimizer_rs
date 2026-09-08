@@ -4,6 +4,7 @@
 //! `--aplicar` automático às caixas. Aqui a ferramenta mostra, explica e **entrega o comando**
 //! — quem decide é a pessoa, item a item.
 
+use optimizer::nucleo::i18n::{t, tf};
 use optimizer::nucleo::util;
 use optimizer::servicos;
 
@@ -22,14 +23,12 @@ pub(crate) fn servicos_cmd() -> Result<(), String> {
         &["list-unit-files", "--state=enabled", "--type=service", "--no-legend", "--no-pager"],
     ));
     if hab.is_empty() {
-        return Err(
-            "não consegui listar os serviços habilitados — esta máquina tem systemd?".into()
-        );
+        return Err(t("services.no_systemd"));
     }
     let custos = servicos::parse_blame(&saida("systemd-analyze", &["blame", "--no-pager"]));
     let lista = servicos::cruzar(&hab, &custos);
 
-    println!("O QUE SOBE NO BOOT ({} serviços habilitados)", lista.len());
+    println!("{}", tf("services.header", &[("count", &lista.len().to_string())]));
     println!();
     for s in &lista {
         let custo = match s.custo_s {
@@ -43,30 +42,26 @@ pub(crate) fn servicos_cmd() -> Result<(), String> {
     let recomendados: Vec<_> = lista.iter().filter(|s| servicos::vale_a_pena(s)).collect();
     println!();
     if recomendados.is_empty() {
-        println!("NADA A SUGERIR");
-        println!("  Os serviços da allowlist ou não estão habilitados aqui, ou não custam");
-        println!("  nada mensurável neste boot. Mexer no sistema por ganho zero é o oposto");
-        println!("  de otimizar.");
+        println!("{}", t("services.nothing_to_suggest"));
         return Ok(());
     }
 
     let ganho: f64 = recomendados.iter().filter_map(|s| s.custo_s).sum();
-    println!("DÁ PARA DESLIGAR COM SEGURANÇA (ganho estimado: {ganho:.1}s de boot)");
+    println!("{}", tf("services.can_disable", &[("gain", &format!("{ganho:.1}"))]));
     println!();
     for s in &recomendados {
         let seg = s.seguro.expect("vale_a_pena garante");
         println!("  {}", s.unidade);
-        println!("    custa       : {:.2}s neste boot", s.custo_s.unwrap_or(0.0));
-        println!("    o que faz   : {}", seg.o_que_faz);
-        println!("    por que dá  : {}", seg.por_que_da);
+        let custo_s = format!("{:.2}", s.custo_s.unwrap_or(0.0));
+        println!("{}", tf("services.costs", &[("seconds", &custo_s)]));
+        println!("{}", tf("services.does", &[("value", &t(seg.o_que_faz))]));
+        println!("{}", tf("services.why_safe", &[("value", &t(seg.por_que_da))]));
         // O custo vem SEMPRE, e vem antes do comando: quem lê tem de poder discordar.
-        println!("    o que perde : {}", seg.o_que_se_perde);
-        println!("    desligar    : sudo systemctl disable --now {}", s.unidade);
-        println!("    voltar      : sudo systemctl enable --now {}", s.unidade);
+        println!("{}", tf("services.what_you_lose", &[("value", &t(seg.o_que_se_perde))]));
+        println!("{}", tf("services.disable_cmd", &[("unit", &s.unidade)]));
+        println!("{}", tf("services.enable_cmd", &[("unit", &s.unidade)]));
         println!();
     }
-    println!("Esta ferramenta NÃO desabilita nada sozinha. Desabilitar serviço é onde se");
-    println!("quebra máquina, e a causa fica longe do sintoma — leia o que se perde, decida");
-    println!("item a item, e rode o comando você.");
+    println!("{}", t("services.we_do_not_touch"));
     Ok(())
 }

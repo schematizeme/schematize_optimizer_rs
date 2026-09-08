@@ -31,6 +31,9 @@ pub struct Caixa {
     /// Nome do slice, sem a extensão (ex.: `dev-build`).
     pub nome: String,
     /// Para que serve — vai no arquivo, para quem abrir daqui a um ano entender.
+    /// CHAVE de catálogo (não prosa): a unit escrita em disco e o relatório traduzem na
+    /// hora. Antes era o texto em português, e o relatório em inglês saía com a descrição em
+    /// português — ver o ADR-0014 (D8).
     pub descricao: String,
     /// Onde o kernel começa a apertar (MiB). É o teto de trabalho.
     pub memory_high_mib: u64,
@@ -63,7 +66,7 @@ pub fn sugerir(ram_mib: u64, nucleos: u32) -> Vec<Caixa> {
     vec![
         Caixa {
             nome: "dev-build".into(),
-            descricao: "compilação e ferramentas de build (cargo, make, npm, gradle)".into(),
+            descricao: "box.build".into(),
             memory_high_mib: metade,
             memory_max_mib: (metade * 3 / 2).min(ram_mib * 9 / 10),
             // Sem teto de CPU de propósito: build lento por cota é o oposto do que se pediu.
@@ -73,7 +76,7 @@ pub fn sugerir(ram_mib: u64, nucleos: u32) -> Vec<Caixa> {
         },
         Caixa {
             nome: "dev-navegador".into(),
-            descricao: "navegadores (cresce sem parar e ninguém percebe)".into(),
+            descricao: "box.browser".into(),
             memory_high_mib: quarto,
             memory_max_mib: quarto * 3 / 2,
             // Um núcleo e meio: o suficiente para o navegador não engasgar, longe de competir
@@ -83,7 +86,7 @@ pub fn sugerir(ram_mib: u64, nucleos: u32) -> Vec<Caixa> {
         },
         Caixa {
             nome: "dev-container".into(),
-            descricao: "Docker/Podman e o que rodar dentro".into(),
+            descricao: "box.container".into(),
             memory_high_mib: quarto,
             memory_max_mib: quarto * 3 / 2,
             cpu_quota_pct: Some(nucleos.saturating_mul(100).saturating_sub(100).max(100)),
@@ -106,13 +109,17 @@ pub fn render(c: &Caixa) -> String {
     s.push_str(
         "# `optimizer limits --revert` apaga este arquivo e devolve o sistema ao que era.\n",
     );
-    s.push_str(&format!("# O quê: {}\n", c.descricao));
+    // A descrição é CHAVE de catálogo; aqui ela vira texto. O arquivo de unit é lido por
+    // humano (e mostrado pelo `systemctl status`), então gravar a chave crua poria
+    // `box.build` na cara de quem for investigar.
+    let descricao = crate::nucleo::i18n::t(&c.descricao);
+    s.push_str(&format!("# O quê: {descricao}\n"));
     s.push_str("#\n");
     s.push_str("# MemoryHigh é onde o kernel começa a APERTAR (fica lento);\n");
     s.push_str("# MemoryMax é onde ele MATA. A distância entre os dois é o que troca\n");
     s.push_str("# \"o build morreu depois de uma hora\" por \"o build demorou mais\".\n");
     s.push_str("[Unit]\n");
-    s.push_str(&format!("Description={}\n\n", c.descricao));
+    s.push_str(&format!("Description={descricao}\n\n"));
     s.push_str("[Slice]\n");
     s.push_str(&format!("MemoryHigh={}M\n", c.memory_high_mib));
     s.push_str(&format!("MemoryMax={}M\n", c.memory_max_mib));

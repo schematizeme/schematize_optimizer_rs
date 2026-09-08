@@ -9,6 +9,8 @@
 //! funcionar sozinho. São ~300 linhas de plataforma, e nada de domínio entra aqui.
 
 pub mod bin;
+
 pub mod desktop;
+pub mod i18n;
 pub mod icone;
 pub mod util;

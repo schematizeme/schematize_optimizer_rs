@@ -50,6 +50,9 @@ pub enum Limitavel {
     /// Dá, e é este o parâmetro de kernel.
     Sim { parametro: &'static str, atual_mib: u64, sugerido_mib: u64 },
     /// Não dá, e este é o motivo — escrito para a pessoa entender, não para se defender.
+    /// CHAVE de catálogo com o motivo (não prosa) — ver o ADR-0014 (D8). A camada `cli`
+    /// traduz na hora de imprimir; guardar o texto aqui fazia o relatório em inglês sair com
+    /// um parágrafo em português no meio.
     Nao(String),
 }
 
@@ -121,11 +124,7 @@ pub fn avaliar(g: &Gpu, ram_bytes: u64) -> Limitavel {
     match g.vendor {
         Vendor::Amd => {
             let Some(gtt) = g.gtt_bytes else {
-                return Limitavel::Nao(
-                    "a GPU é AMD, mas o driver não expôs o GTT em /sys — sem o valor atual não \
-                     dá para sugerir um teto com honestidade"
-                        .into(),
-                );
+                return Limitavel::Nao("gpu.amd_no_gtt".into());
             };
             Limitavel::Sim {
                 parametro: "amdgpu.gttsize",
@@ -133,21 +132,9 @@ pub fn avaliar(g: &Gpu, ram_bytes: u64) -> Limitavel {
                 sugerido_mib: sugerir_gtt_mib(ram_bytes),
             }
         }
-        Vendor::Intel => Limitavel::Nao(
-            "no Intel a memória da GPU integrada é fixada pelo FIRMWARE (DVMT), no setup da \
-             UEFI — o Linux não a altera em runtime. Para mudar, é no setup da placa, não aqui"
-                .into(),
-        ),
-        Vendor::Nvidia => Limitavel::Nao(
-            "GPU NVIDIA discreta usa a VRAM própria, e não RAM do sistema por GTT — não há o \
-             que limitar aqui"
-                .into(),
-        ),
-        Vendor::Desconhecido => Limitavel::Nao(
-            "não consegui identificar o vendor da GPU em /sys/class/drm — não vou sugerir \
-             parâmetro de kernel às cegas"
-                .into(),
-        ),
+        Vendor::Intel => Limitavel::Nao("gpu.intel_firmware".into()),
+        Vendor::Nvidia => Limitavel::Nao("gpu.nvidia_own_vram".into()),
+        Vendor::Desconhecido => Limitavel::Nao("gpu.unknown_vendor".into()),
     }
 }
 
