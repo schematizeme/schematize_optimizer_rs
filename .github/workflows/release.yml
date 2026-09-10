@@ -1,0 +1,169 @@
+name: release
+
+# POR QUE ISTO EXISTE
+#
+# Sem release, `releases/latest/download/` não serve nada e o app só chega em quem compila do
+# fonte. Foi a dívida nº 1 do `schematize_cli_rs` — os releases ficaram 19 versões atrás do
+# `main`, e foi essa defasagem que quebrou o `curl | bash` de todo mundo.
+#
+# Aqui o release nasce com o repo, e a tag é o gatilho: cortar tag É publicar.
+#
+# ESTE ARQUIVO NASCEU DEPOIS DO APP, e a lacuna é o que ele conserta. O optimizer tinha CI mas
+# nenhum release: `releases/latest/download/` não servia nada, e o app só chegava em quem
+# compilava do fonte. Foi a dívida nº 1 do `schematize_cli_rs`, e repeti-la num app novo seria
+# não ter aprendido.
+#
+# A JANELA vem junto, no mesmo release (ADR-0014 D5): o dono do binário é o dono da janela
+# dele. Ela mora em repo próprio porque não depende deste crate — é `std`-only e fala só com o
+# binário headless, o que a impede de embutir uma versão via git-dep.
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  criar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: cria o release (rascunho vira público ao fim)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh release view "${GITHUB_REF_NAME}" >/dev/null 2>&1 \
+            || gh release create "${GITHUB_REF_NAME}" \
+                 --title "${GITHUB_REF_NAME}" \
+                 --notes "schematize deployer ${GITHUB_REF_NAME} — diagnóstico da máquina e tetos por software."
+
+  binarios:
+    needs: criar
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-latest
+            asset: schematize-optimizer-linux-x86_64
+            asset_gui: schematize-optimizer-gui-linux-x86_64
+          # `macos-15` e nao `macos-14`: a 14 ja esta marcada DEPRECATED no
+          # `actions/runner-images` (issue 13518), a caminho do mesmo destino da 13 descrito
+          # logo abaixo. Trocar antes de a imagem sumir custa esta linha.
+          - runner: macos-15
+            asset: schematize-optimizer-macos-arm64
+            asset_gui: schematize-optimizer-gui-macos-arm64
+          # Intel CROSS-COMPILADO no runner arm64, e nao numa imagem macOS x64.
+          #
+          # A familia de imagens x64 do macOS e a que vem sendo aposentada, e o modo de falha
+          # dela e o pior possivel: o job nao reprova, fica *queued* para sempre e segura o
+          # release inteiro. Ja aconteceu neste ecossistema (CONTEXT.md §4) com a `macos-13`;
+          # a `macos-14` esta DEPRECATED agora (actions/runner-images issue 13518); e a
+          # `macos-15-intel`, embora valida, e desconhecida do actionlint 1.7.7 — o que
+          # deixava o gate deste repo vermelho por falso positivo.
+          #
+          # Cross-compilar tira o repo dessa esteira inteira: um runner arm64 so, dois alvos.
+          # E o mesmo desenho que o CLI, o updater e o market ja usam.
+          - runner: macos-15
+            target: x86_64-apple-darwin
+            asset: schematize-optimizer-macos-x86_64
+            asset_gui: schematize-optimizer-gui-macos-x86_64
+          - runner: windows-latest
+            asset: schematize-optimizer-windows-x86_64.exe
+            asset_gui: schematize-optimizer-gui-windows-x86_64.exe
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-relcargo-${{ hashFiles('**/Cargo.lock') }}
+
+      # `--locked` de propósito: o binário de uma tag tem de vir do lock DAQUELA tag.
+      # Sem isso, recompilar a mesma tag pode dar outro binário — que foi exatamente a
+      # dívida que o `schematize_cli_rs` levou meses para pagar.
+      #
+      # `matrix.target` so existe na linha do Intel cross-compilado; nas outras o build e
+      # nativo e o alvo default do runner ja e o certo.
+      - name: alvo de cross-compilacao
+        if: matrix.target != ''
+        run: rustup target add ${{ matrix.target }}
+
+      - name: build release
+        run: cargo build --release --locked ${{ matrix.target && format('--target {0}', matrix.target) || '' }}
+
+      # A JANELA do optimizer, publicada AO LADO do binário — o mesmo desenho que o market já
+      # usa (ADR-0014 D5): o dono do binário é o dono da janela dele.
+      #
+      # Ela vive em repo próprio porque não depende deste crate: é `std`-only e fala só com o
+      # binário headless, o que a impede de embutir uma versão via git-dep — o bug que fez a
+      # janela irmã "abrir a versão antiga". Sair DAQUI custa este bloco; um release próprio
+      # custaria outra matriz de quatro alvos e outra tag para lembrar de cortar.
+      #
+      # BEST-EFFORT: se ela não compilar, o release do optimizer NÃO falha. O binário headless é
+      # o que precisa chegar; a janela é a interface por cima dele, e falhar o release inteiro
+      # por causa dela inverteria a prioridade.
+      #
+      # As deps de Linux não são opcionais e a ausência delas falha EM SILÊNCIO: com
+      # `continue-on-error: true`, o `conclusion` do passo vira `success` mesmo com
+      # `outcome: failure`. Sem elas o release sairia "verde" com um asset a menos, e o que
+      # faltaria seria justamente o da plataforma principal. Já aconteceu no market.
+      - name: deps da janela (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y \
+            pkg-config \
+            libx11-dev libxcursor-dev libxrandr-dev libxi-dev \
+            libxkbcommon-dev libwayland-dev libgl1-mesa-dev \
+            libxcb1-dev libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev \
+            libfontconfig1-dev
+
+      - name: Janela do optimizer (opcional)
+        id: janela
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          git clone --depth 1 https://github.com/schematizeme/schematize_optimizer_gui_rs.git ../janela
+          cargo build --release --locked --manifest-path ../janela/Cargo.toml \
+            ${{ matrix.target && format('--target {0}', matrix.target) || '' }}
+          dir="../janela/target/${{ matrix.target }}/release"
+          [ -n "${{ matrix.target }}" ] || dir="../janela/target/release"
+          sfx=""; [ "${{ runner.os }}" = "Windows" ] && sfx=".exe"
+          cp "$dir/schematize-optimizer-gui$sfx" "${{ matrix.asset_gui }}"
+
+      - name: renomeia p/ o nome estável do asset
+        shell: bash
+        run: |
+          set -euo pipefail
+          dir="target/${{ matrix.target }}/release"
+          [ -n "${{ matrix.target }}" ] || dir="target/release"
+          if [ "${{ runner.os }}" = "Windows" ]; then
+            cp "$dir/schematize-optimizer.exe" "${{ matrix.asset }}"
+          else
+            cp "$dir/schematize-optimizer" "${{ matrix.asset }}"
+          fi
+
+      - name: publica
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: gh release upload "${GITHUB_REF_NAME}" "${{ matrix.asset }}" --clobber
+
+      # A janela entra só se o passo dela deu certo — `continue-on-error` deixa o job seguir, e
+      # sem esta condição o upload tentaria anexar um arquivo que não existe.
+      - name: publica a janela
+        if: steps.janela.outcome == 'success'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: gh release upload "${GITHUB_REF_NAME}" "${{ matrix.asset_gui }}" --clobber
