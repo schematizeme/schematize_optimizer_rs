@@ -3,4 +3,5 @@
 pub(crate) mod args;
 pub(crate) mod caixas;
 pub(crate) mod diag;
+pub(crate) mod saidajson;
 pub(crate) mod servicos;

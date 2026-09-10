@@ -16,10 +16,25 @@ fn gib(b: u64) -> String {
     format!("{:.1} GB", b as f64 / 1_073_741_824.0)
 }
 
-pub(crate) fn diag_cmd(wait: bool) -> Result<(), String> {
+/// **O quê:** mede a máquina e diz o que dá para melhorar. **Não muda nada.**
+///
+/// **Onde:** `schematize-optimizer diag`, que é o comando padrão e o que o ícone abre.
+///
+/// **`json` sai ANTES de qualquer `println!` humano** e retorna: uma linha de relatório
+/// impressa junto tornaria o documento inválido, e a janela mostraria tela vazia sem dizer
+/// por quê. O `--json` também é `conflicts_with` do `--wait` no clap — esperar tecla numa
+/// saída de máquina travaria a janela para sempre.
+pub(crate) fn diag_cmd(wait: bool, json: bool) -> Result<(), String> {
     let m = maquina::detectar();
     let g = gpu::detectar();
     let cg = maquina::cgroup_v2(std::path::Path::new("/sys/fs/cgroup"));
+    let fora_do_menu =
+        !optimizer::nucleo::desktop::arquivo_desktop(&optimizer::nucleo::util::home()).exists();
+
+    if json {
+        super::saidajson::diag(&m, &g, cg, fora_do_menu);
+        return Ok(());
+    }
 
     println!("{}", t("diag.machine_header"));
     println!("{}", tf("diag.machine_ram", &[("value", &gib(m.ram_bytes))]));
@@ -69,7 +84,7 @@ pub(crate) fn diag_cmd(wait: bool) -> Result<(), String> {
     println!("{}", t("diag.boxes_header"));
     println!("{}", t(if cg { "diag.boxes_available" } else { "diag.boxes_unavailable" }));
 
-    if !optimizer::nucleo::desktop::arquivo_desktop(&optimizer::nucleo::util::home()).exists() {
+    if fora_do_menu {
         println!();
         println!("{}", t("diag.not_in_menu"));
     }

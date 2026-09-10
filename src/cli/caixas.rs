@@ -7,8 +7,28 @@ use optimizer::diag::maquina;
 use optimizer::nucleo::i18n::{t, tf};
 use optimizer::nucleo::util;
 
-pub(crate) fn caixas_cmd(apply: bool, revert: bool) -> Result<(), String> {
+/// **O quê:** mostra os tetos por software e, só com `--apply`, escreve os slices.
+///
+/// **Onde:** `schematize-optimizer limits`, e a tela de limites da janela via `--json`.
+///
+/// **O `--json` é SÓ LEITURA, e o clap o proíbe junto de `--apply`/`--revert`.** Ele existe
+/// para a tela poder mostrar o que MUDA na máquina **antes** de mudar — é onde a janela ganha
+/// da CLI. Se ele também aplicasse, a leitura que alimenta a pré-visualização seria a mesma
+/// chamada que executa, e não haveria "antes" para mostrar.
+///
+/// **E ele não erra quando falta cgroup v2.** O caminho humano devolve `Err` ali, o que para
+/// a janela seria uma tela vazia sem explicação; no JSON, `cgroup_v2: false` é um campo, e a
+/// tela desenha o motivo.
+pub(crate) fn caixas_cmd(apply: bool, revert: bool, json: bool) -> Result<(), String> {
     let home = util::home();
+    let cg = maquina::cgroup_v2(std::path::Path::new("/sys/fs/cgroup"));
+
+    if json {
+        let m = maquina::detectar();
+        let caixas = slice::sugerir(m.ram_bytes / (1024 * 1024), m.nucleos);
+        super::saidajson::limits(&caixas, cg, &slice::instalados(&home));
+        return Ok(());
+    }
 
     if revert {
         // O revert vem primeiro e sozinho: combinar `--revert` com `--apply` seria pedir duas
@@ -21,7 +41,7 @@ pub(crate) fn caixas_cmd(apply: bool, revert: bool) -> Result<(), String> {
     }
 
     let m = maquina::detectar();
-    if !maquina::cgroup_v2(std::path::Path::new("/sys/fs/cgroup")) {
+    if !cg {
         return Err(t("limits.no_cgroups"));
     }
     let ram_mib = m.ram_bytes / (1024 * 1024);

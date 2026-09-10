@@ -17,16 +17,35 @@ fn saida(cmd: &str, args: &[&str]) -> String {
     util::run(cmd, args).unwrap_or_default()
 }
 
-pub(crate) fn servicos_cmd() -> Result<(), String> {
+/// **O quê:** lista o que sobe no boot, com o custo de cada um, e marca o pouco que a
+/// allowlist considera seguro desligar. **Só relata.**
+///
+/// **Onde:** `schematize-optimizer services`, e a lista secundária da tela de limites via
+/// `--json`.
+///
+/// **Sem systemd o JSON não erra, devolve `systemd: false` com a lista vazia.** O caminho
+/// humano devolve `Err` — quem está no terminal quer saber que não há o que relatar. Uma
+/// janela que recebesse erro não teria o que desenhar e mostraria tela vazia sem dizer por
+/// quê, que é o modo de falha mais difícil de diagnosticar.
+pub(crate) fn servicos_cmd(json: bool) -> Result<(), String> {
     let hab = servicos::parse_habilitados(&saida(
         "systemctl",
         &["list-unit-files", "--state=enabled", "--type=service", "--no-legend", "--no-pager"],
     ));
     if hab.is_empty() {
+        if json {
+            super::saidajson::services(&[], false);
+            return Ok(());
+        }
         return Err(t("services.no_systemd"));
     }
     let custos = servicos::parse_blame(&saida("systemd-analyze", &["blame", "--no-pager"]));
     let lista = servicos::cruzar(&hab, &custos);
+
+    if json {
+        super::saidajson::services(&lista, true);
+        return Ok(());
+    }
 
     println!("{}", tf("services.header", &[("count", &lista.len().to_string())]));
     println!();

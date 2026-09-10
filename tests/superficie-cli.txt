@@ -6,10 +6,13 @@ CMD schematize-optimizer desktop
   ARG remove               --remove
 CMD schematize-optimizer diag
   SOBRE Measure the machine and say what can be improved. Changes NOTHING. This is what the icon opens
+  ARG json                 --json
   ARG wait                 --wait
 CMD schematize-optimizer limits
   SOBRE Per-software resource ceilings (build, browser, container), via systemd slices
   ARG apply                --apply
+  ARG json                 --json
   ARG revert               --revert
 CMD schematize-optimizer services
   SOBRE What starts at boot, what it costs, and the little that is safe to turn off
+  ARG json                 --json

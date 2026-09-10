@@ -26,9 +26,9 @@ fn main() {
     restaurar_sigpipe();
     let cli = Cli::parse();
     let r = match cli.cmd {
-        Cmd::Diag { wait } => cli::diag::diag_cmd(wait),
-        Cmd::Limits { apply, revert } => cli::caixas::caixas_cmd(apply, revert),
-        Cmd::Services => cli::servicos::servicos_cmd(),
+        Cmd::Diag { wait, json } => cli::diag::diag_cmd(wait, json),
+        Cmd::Limits { apply, revert, json } => cli::caixas::caixas_cmd(apply, revert, json),
+        Cmd::Services { json } => cli::servicos::servicos_cmd(json),
         Cmd::Desktop { install, remove } => cli::diag::desktop_cmd(install, remove),
     };
     if let Err(e) = r {

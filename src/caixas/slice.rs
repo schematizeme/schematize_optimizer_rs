@@ -176,6 +176,46 @@ pub fn nosso(conteudo: &str) -> bool {
     conteudo.contains("Gerado por `schematize optimizer`")
 }
 
+/// **O quê:** os nomes dos slices que ESTA ferramenta já pôs no disco, em ordem alfabética.
+///
+/// **Onde:** `limits --json`, que é o que alimenta a tela de limites da janela.
+///
+/// **Por que a tela precisa disto separado de [`sugerir`]:** o que a ferramenta sugere e o
+/// que está aplicado são coisas diferentes, e é a diferença entre os dois que a tela mostra
+/// **antes** de aplicar. Sem este lado a janela só saberia o que ela quer fazer, nunca o que
+/// já está feito — e um botão "aplicar" que não sabe o estado atual não tem como mostrar o
+/// que muda.
+///
+/// **Só conta o que é nosso**, pela mesma marca que [`reverter`] usa: um `.slice` alheio com
+/// nome parecido não é nosso e não entra na conta, senão a tela diria "já aplicado" sobre
+/// configuração de outra pessoa.
+///
+/// Ordem alfabética porque a ordem do `read_dir` é a do sistema de arquivos, e um contrato
+/// cuja ordem muda entre leituras faz a tela piscar sem nada ter mudado.
+pub fn instalados(home: &Path) -> Vec<String> {
+    let mut nomes = Vec::new();
+    let Ok(entradas) = std::fs::read_dir(dir_slices(home)) else {
+        // Nunca aplicado é estado NORMAL: lista vazia, não erro.
+        return nomes;
+    };
+    for e in entradas.flatten() {
+        let p = e.path();
+        if p.extension().and_then(|x| x.to_str()) != Some("slice") {
+            continue;
+        }
+        match std::fs::read_to_string(&p) {
+            Ok(c) if nosso(&c) => {
+                if let Some(n) = p.file_stem().and_then(|x| x.to_str()) {
+                    nomes.push(n.to_string());
+                }
+            }
+            _ => {}
+        }
+    }
+    nomes.sort();
+    nomes
+}
+
 /// **O quê:** apaga os slices que ESTA ferramenta gerou, e só eles. Devolve o que apagou.
 ///
 /// **Onde:** `optimizer limits --revert`.

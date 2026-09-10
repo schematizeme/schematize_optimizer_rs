@@ -33,6 +33,10 @@ pub(crate) enum Cmd {
         /// terminal would close instantly and the click would look like it did nothing.
         #[arg(long)]
         wait: bool,
+        /// Machine-readable output. Stable keys, never translated — this is what the window
+        /// reads. Human output goes through the i18n catalog and is NOT a contract.
+        #[arg(long, conflicts_with = "wait")]
+        json: bool,
     },
     /// Per-software resource ceilings (build, browser, container), via systemd slices.
     Limits {
@@ -42,9 +46,17 @@ pub(crate) enum Cmd {
         /// Delete the slices THIS tool generated — and only those.
         #[arg(long)]
         revert: bool,
+        /// Machine-readable output: what is suggested AND what is already on disk, so the
+        /// window can show what changes before changing it. Reads only; never writes.
+        #[arg(long, conflicts_with_all = ["apply", "revert"])]
+        json: bool,
     },
     /// What starts at boot, what it costs, and the little that is safe to turn off.
-    Services,
+    Services {
+        /// Machine-readable output. Stable keys, never translated.
+        #[arg(long)]
+        json: bool,
+    },
     /// Icon and application-menu entry — so the app opens without schematize.
     Desktop {
         /// Install (the default when no flag is given).
