@@ -29,6 +29,12 @@ fn main() {
         Cmd::Diag { wait, json } => cli::diag::diag_cmd(wait, json),
         Cmd::Limits { apply, revert, json } => cli::caixas::caixas_cmd(apply, revert, json),
         Cmd::Services { json } => cli::servicos::servicos_cmd(json),
+        Cmd::Disco { min_dias, dirs, json } => cli::disco::disco_cmd(min_dias, dirs, json),
+        Cmd::DiscoClean { min_dias, dirs, tipo, montagem, yes } => {
+            cli::disco::limpar_cmd(min_dias, dirs, tipo, montagem, yes)
+        }
+        Cmd::DiscoDocker { podar, yes } => cli::disco::docker_cmd(podar, yes),
+        Cmd::Agentes { json } => cli::agentes::agentes_cmd(json),
         Cmd::Desktop { install, remove } => cli::diag::desktop_cmd(install, remove),
     };
     if let Err(e) = r {

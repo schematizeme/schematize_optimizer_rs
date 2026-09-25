@@ -23,7 +23,15 @@
 //! 4. **Nada de heurística sobre o que a pessoa usa.** Desabilitar bluetooth "porque parece
 //!    inútil" numa máquina de teclado bluetooth deixa alguém sem teclado.
 
+// A capacidade da MÁQUINA — o que ela aguenta, e o que está desperdiçando.
+//
+// Os dois chegaram na fase E3 do ADR-0018, vindos do app principal. Eles respondem a MESMA
+// pergunta que este app já fazia ("o que esta máquina aguenta?"), e estarem no hub era acidente
+// de história: o `disco` nasceu junto com a tela que o mostrava, e o `agentes` junto com o
+// overdev que precisava do número.
+pub mod agentes;
 pub mod caixas;
 pub mod diag;
+pub mod disco;
 pub mod nucleo;
 pub mod servicos;

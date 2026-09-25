@@ -107,6 +107,23 @@ impl Json {
             outro => panic!("esperava lista, veio {outro:?}"),
         }
     }
+    /// **O quê:** o texto, se isto for string. **Onde:** as asserções sobre SLUGS.
+    ///
+    /// Devolve `None` para qualquer outro tipo, em vez de converter: um número que virasse
+    /// `"8"` faria uma asserção de slug passar sobre um campo que não é slug nenhum.
+    fn texto(&self) -> Option<String> {
+        match self {
+            Json::Str(s) => Some(s.clone()),
+            _ => None,
+        }
+    }
+    /// **O quê:** o número, se isto for número. **Onde:** a asserção da invariante dos tetos.
+    fn numero(&self) -> Option<f64> {
+        match self {
+            Json::Num(n) => Some(*n),
+            _ => None,
+        }
+    }
 }
 
 /// **O quê:** parseia um documento inteiro; entrada de lixo vira `Err` com a posição.
@@ -232,13 +249,33 @@ fn parse(txt: &str) -> Json {
 /// o documento.
 const IDIOMAS: &[&str] = &["en_US.UTF-8", "pt_BR.UTF-8", "C", "ja_JP.UTF-8"];
 
+/// **Todo subcomando com `--json`, e a lista é UMA só.**
+///
+/// Ela existe aqui, e não repetida em cada teste, porque a fase E3 do ADR-0018 acrescentou dois
+/// subcomandos — e, com a lista repetida, acrescentar um significaria lembrar de três lugares.
+/// Esquecer um deixaria o contrato novo sem o teste de idioma, que é justamente o que este
+/// arquivo existe para travar.
+const SUBCOMANDOS: &[&[&str]] = &[&["diag"], &["limits"], &["services"], &["disco"], &["agentes"]];
+
+/// Os subcomandos cujo documento é ESTÁVEL entre duas invocações seguidas.
+///
+/// **O `agentes` fica de fora, e não é omissão:** ele carrega `load1` e `running_claudes`, que
+/// mudam ENTRE UMA CHAMADA E OUTRA por definição — o load average é uma média móvel. Compará-lo
+/// byte a byte é um teste que passa sozinho e falha na suíte cheia, que é a definição de flaky.
+/// Descobri isso do jeito certo: ele passou isolado e reprovou no `--all-targets`.
+///
+/// **A regra que o `agentes` tem de cumprir está em `o_agentes_nao_tem_prosa_para_traduzir`**, e
+/// é mais forte que igualdade de bytes: o documento não tem NENHUMA string traduzível, então não
+/// há o que mudar com o idioma.
+const SUBCOMANDOS_ESTAVEIS: &[&[&str]] = &[&["diag"], &["limits"], &["services"], &["disco"]];
+
 /// **O BUG QUE ESTE ARQUIVO TRAVA.** O documento é o mesmo em qualquer idioma — byte a byte.
 ///
 /// Se um dia alguém puser uma frase traduzida num campo (`"reason": "no Intel a memória…"`),
 /// este teste falha na hora, e não seis meses depois na máquina de um usuário japonês.
 #[test]
-fn os_tres_json_sao_byte_a_byte_iguais_em_qualquer_idioma() {
-    for sub in [&["diag"][..], &["limits"][..], &["services"][..]] {
+fn os_json_sao_byte_a_byte_iguais_em_qualquer_idioma() {
+    for sub in SUBCOMANDOS_ESTAVEIS {
         let referencia = rodar(sub, IDIOMAS[0]);
         for lang in &IDIOMAS[1..] {
             let outro = rodar(sub, lang);
@@ -255,8 +292,8 @@ fn os_tres_json_sao_byte_a_byte_iguais_em_qualquer_idioma() {
 
 /// Os três documentos são JSON válido de verdade, e acabam onde dizem acabar.
 #[test]
-fn os_tres_json_sao_validos_e_nao_tem_sobra() {
-    for sub in [&["diag"][..], &["limits"][..], &["services"][..]] {
+fn os_json_sao_validos_e_nao_tem_sobra() {
+    for sub in SUBCOMANDOS {
         let v = parse(&rodar(sub, "en_US.UTF-8"));
         assert!(v.get("optimizer").is_some(), "todo documento diz de que versão veio: {sub:?}");
     }
@@ -394,4 +431,140 @@ fn o_parser_do_teste_reprova_o_que_e_invalido() {
     // E aceita o que é válido — um reprovador que reprova tudo também é cego.
     let mut i = 0;
     assert!(parse_valor(br#"{"a": [1, true, null, "x"]}"#, &mut i).is_ok());
+}
+
+// ---------------------------------------------------------------------------
+// DISCO e AGENTES — chegaram na fase E3 do ADR-0018, vindos do app principal.
+// ---------------------------------------------------------------------------
+
+/// **O contrato do `disco`.** Estas chaves são lidas pela aba Disco da janela.
+///
+/// O documento traz os TRÊS cortes da mesma varredura (por disco, por tipo, e os achados)
+/// porque fazer a janela recalcular os agregados seria duas somas do mesmo número — e a que
+/// divergisse mostraria um total que não bate com as linhas.
+#[test]
+fn o_shape_do_disco_e_contrato() {
+    let v = parse(&rodar(&["disco"], "en_US.UTF-8"));
+    for k in
+        ["optimizer", "total_bytes", "por_montagem", "por_tipo", "achados", "docker_disponivel"]
+    {
+        assert!(v.get(k).is_some(), "falta a chave `{k}` no contrato do disco");
+    }
+    // `docker_disponivel` é SEPARADO da lista vazia: máquina sem docker e máquina com docker e
+    // nada a recuperar são estados diferentes, e a janela desenha os dois de formas diferentes.
+    assert!(v.get("docker").is_some(), "a lista do docker existe mesmo quando vazia");
+
+    // Os achados, quando há: o slug do tipo é conjunto FECHADO, e `bytes` é NÚMERO.
+    if let Some(a) = v.get("achados").map(|x| x.arr()).and_then(|a| a.first()) {
+        for k in ["caminho", "tipo", "bytes", "dias_parado", "montagem", "refaz_text"] {
+            assert!(a.get(k).is_some(), "falta `{k}` num achado");
+        }
+    }
+}
+
+/// **O slug do tipo NÃO é o rótulo humano.**
+///
+/// O `rotulo()` é prosa (`"target (Rust)"`, com espaço e parêntese) e muda de redação; o slug é
+/// o que a janela casa para escolher ícone e filtro. Confundir os dois é o defeito que este
+/// projeto já pagou duas vezes — e o teste o impede por CONSTRUÇÃO: um slug com espaço ou
+/// parêntese reprova.
+#[test]
+fn o_slug_do_tipo_de_disco_e_estavel_e_nao_e_prosa() {
+    let v = parse(&rodar(&["disco"], "en_US.UTF-8"));
+    let conhecidos = [
+        "rust-target",
+        "node-modules",
+        "node-build",
+        "npm-cache",
+        "go-cache",
+        "python-cache",
+        "python-venv",
+        "cargo-cache",
+    ];
+    for t in v.get("por_tipo").map(|x| x.arr()).unwrap_or(&[]) {
+        let slug = t.get("tipo").and_then(|x| x.texto()).unwrap_or_default();
+        assert!(
+            conhecidos.contains(&slug.as_str()),
+            "`{slug}` não é um slug conhecido — o conjunto é FECHADO e a janela ramifica por ele"
+        );
+        assert!(
+            !slug.contains(' ') && !slug.contains('('),
+            "`{slug}` parece PROSA, não slug — o rótulo humano vazou para o contrato"
+        );
+    }
+}
+
+/// **O contrato do `agentes`, e por que os TRÊS tetos entram.**
+///
+/// O `total_cap` é o menor deles. Um documento só com o resultado obrigaria a janela a
+/// adivinhar qual recurso está apertando — ou a recalcular, que é duas leis para o mesmo número.
+#[test]
+fn o_shape_do_agentes_e_contrato_e_traz_os_tres_tetos() {
+    let v = parse(&rodar(&["agentes"], "en_US.UTF-8"));
+    for k in [
+        "optimizer",
+        "threads",
+        "mem_available_mb",
+        "load1",
+        "running_claudes",
+        "cpu_cap",
+        "ram_cap",
+        "load_cap",
+        "total_cap",
+        "available",
+        "ram_tight",
+    ] {
+        assert!(v.get(k).is_some(), "falta a chave `{k}` no contrato dos agentes");
+    }
+    // A invariante do domínio, afirmada no CONTRATO: o teto final é o menor dos três.
+    let n = |k: &str| v.get(k).and_then(|x| x.numero()).unwrap_or(-1.0);
+    let menor = n("cpu_cap").min(n("ram_cap")).min(n("load_cap"));
+    assert_eq!(n("total_cap"), menor, "o teto total tem de ser o MENOR dos três");
+    assert!(n("available") <= n("total_cap"), "disponível nunca passa do teto");
+    assert!(n("available") >= 0.0, "disponível nunca é negativo");
+}
+
+/// **O `agentes` não tem prosa para traduzir — e isso é mais forte que igualdade de bytes.**
+///
+/// Ele não entra no teste byte a byte porque `load1` e `running_claudes` mudam entre duas
+/// chamadas (o load é média móvel). A garantia equivalente é estrutural: se o documento não tem
+/// NENHUMA string além da versão, não há o que um catálogo de tradução possa alcançar.
+#[test]
+fn o_agentes_nao_tem_prosa_para_traduzir() {
+    let v = parse(&rodar(&["agentes"], "en_US.UTF-8"));
+    let Json::Obj(m) = &v else { panic!("o documento é um objeto") };
+    for (k, valor) in m {
+        if k == "optimizer" {
+            continue; // a versão é string por natureza, e não é prosa
+        }
+        assert!(
+            valor.texto().is_none(),
+            "`{k}` é uma STRING no contrato do agentes — prosa aqui é o que um dia vira \
+             tradução, e aí o documento muda com o idioma"
+        );
+    }
+}
+
+/// **`refaz_text` é o único campo de prosa do `disco`, e o `_text` no nome é a declaração.**
+///
+/// Precedente do `status_text` do market. O teste existe para impedir que um SEGUNDO campo de
+/// prosa entre sem o sufixo — porque o sufixo é o que avisa quem lê que ali não se ramifica.
+#[test]
+fn a_unica_prosa_do_disco_se_declara_no_nome() {
+    let v = parse(&rodar(&["disco"], "en_US.UTF-8"));
+    for a in v.get("achados").map(|x| x.arr()).unwrap_or(&[]) {
+        let Json::Obj(m) = a else { panic!("cada achado é um objeto") };
+        for (k, valor) in m {
+            if valor.texto().is_none() || k.ends_with("_text") {
+                continue;
+            }
+            // Caminho e slug são strings, mas NÃO são prosa: um é identificador do sistema de
+            // arquivos, o outro é conjunto fechado. Os dois são estáveis entre idiomas.
+            assert!(
+                ["caminho", "montagem", "tipo"].contains(&k.as_str()),
+                "`{k}` é uma string nova no contrato do disco. Se for prosa, o nome tem de \
+                 terminar em `_text`; se for decisão, tem de ser slug de conjunto fechado"
+            );
+        }
+    }
 }

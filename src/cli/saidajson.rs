@@ -204,6 +204,135 @@ pub(crate) fn services(lista: &[Servico], tem_systemd: bool) {
     println!("}}");
 }
 
+// ---------------------------------------------------------------------------
+// DISCO e AGENTES — chegaram na fase E3 do ADR-0018, vindos do app principal.
+// ---------------------------------------------------------------------------
+
+/// **O quê:** o slug ESTÁVEL de um tipo de achado de disco. **Onde:** [`disco`].
+///
+/// **Slug próprio, e não o `rotulo()`:** aquele é PROSA para humano (`"target (Rust)"`, com
+/// espaço e parêntese) e muda de redação; este é o que a janela casa para escolher o ícone e o
+/// filtro. Misturar os dois é o defeito que este projeto já pagou duas vezes.
+fn slug_tipo(t: optimizer::disco::Tipo) -> &'static str {
+    use optimizer::disco::Tipo;
+    match t {
+        Tipo::RustTarget => "rust-target",
+        Tipo::NodeModules => "node-modules",
+        Tipo::NodeBuild => "node-build",
+        Tipo::NodeCache => "npm-cache",
+        Tipo::GoCache => "go-cache",
+        Tipo::PythonCache => "python-cache",
+        Tipo::PythonVenv => "python-venv",
+        Tipo::CargoCache => "cargo-cache",
+    }
+}
+
+/// **O quê:** o inventário de disco como documento de máquina.
+///
+/// **Onde:** `disco --json`, que é o que a aba Disco da janela lê.
+///
+/// **Os TRÊS cortes vão juntos** (por disco, por tipo, e os achados) porque são a mesma varredura
+/// vista de três ângulos. Fazer a janela recalcular os agregados a partir da lista significaria
+/// duas somas do mesmo número, e a que divergisse mostraria um total que não bate com as linhas.
+///
+/// **`bytes` cru, sem formatar.** `"1.2 GB"` é prosa: depende de idioma (vírgula ou ponto) e de
+/// arredondamento. A janela formata; o contrato carrega o número.
+///
+/// **`refaz_text` é o ÚNICO campo de prosa, e o `_text` no nome é a declaração disso** — é o
+/// precedente que o `status_text` do market abriu. Ele explica em uma frase como o artefato se
+/// refaz (*"recriado no próximo go build"*), e não há como reduzir isso a um slug sem perder a
+/// informação. Quem lê sabe, pelo nome, que não pode ramificar por ele. O campo que a janela
+/// ramifica é o `tipo`, que é slug.
+pub(crate) fn disco(
+    achados: &[optimizer::disco::Achado],
+    docker: &[optimizer::disco::docker::Categoria],
+) -> String {
+    let por_montagem: Vec<String> = optimizer::disco::por_montagem(achados)
+        .into_iter()
+        .map(|(m, b)| format!("{{\"montagem\":\"{}\",\"bytes\":{}}}", esc(&m.to_string_lossy()), b))
+        .collect();
+    let por_tipo: Vec<String> = optimizer::disco::por_tipo(achados)
+        .into_iter()
+        .map(|(t, b)| {
+            format!(
+                "{{\"tipo\":\"{}\",\"bytes\":{},\"custa_rede\":{}}}",
+                slug_tipo(t),
+                b,
+                t.custa_rede()
+            )
+        })
+        .collect();
+    let itens: Vec<String> = achados
+        .iter()
+        .map(|a| {
+            format!(
+                "{{\"caminho\":\"{}\",\"tipo\":\"{}\",\"bytes\":{},\"dias_parado\":{},\
+                 \"montagem\":\"{}\",\"refaz_text\":\"{}\"}}",
+                esc(&a.caminho.to_string_lossy()),
+                slug_tipo(a.tipo),
+                a.bytes,
+                a.dias_parado,
+                esc(&a.montagem.to_string_lossy()),
+                esc(a.refaz)
+            )
+        })
+        .collect();
+    let cats: Vec<String> = docker
+        .iter()
+        .map(|c| {
+            format!(
+                "{{\"tipo\":\"{}\",\"bytes\":{},\"recuperavel\":{}}}",
+                esc(&c.tipo),
+                c.bytes,
+                c.recuperavel
+            )
+        })
+        .collect();
+    // `docker_disponivel` separado da lista vazia: máquina SEM docker e máquina com docker e
+    // nada a recuperar são estados diferentes, e a janela desenha os dois de formas diferentes.
+    // `optimizer` em todo documento, como nos três irmãos: quem lê precisa saber de QUE versão
+    // do app o contrato veio, senão um campo ausente é indistinguível de um app antigo.
+    format!(
+        "{{\"optimizer\":\"{}\",\"total_bytes\":{},\"por_montagem\":[{}],\"por_tipo\":[{}],\
+         \"achados\":[{}],\"docker_disponivel\":{},\"docker\":[{}]}}",
+        env!("CARGO_PKG_VERSION"),
+        achados.iter().map(|a| a.bytes).sum::<u64>(),
+        por_montagem.join(","),
+        por_tipo.join(","),
+        itens.join(","),
+        optimizer::disco::docker::disponivel(),
+        cats.join(",")
+    )
+}
+
+/// **O quê:** o orçamento de concorrência como documento de máquina.
+///
+/// **Onde:** `agentes --json`.
+///
+/// **Os três tetos entram, e não só o menor:** o `total_cap` é o mínimo deles, e quem lê precisa
+/// saber QUAL recurso está apertando para decidir o que fazer. Um documento com só o resultado
+/// obrigaria a janela a adivinhar — ou a recalcular, que é duas leis para o mesmo número.
+pub(crate) fn agentes(b: &optimizer::agentes::Budget) -> String {
+    format!(
+        "{{\"optimizer\":\"{}\",\"threads\":{},\"mem_available_mb\":{},\"load1\":{},\
+         \"running_claudes\":{},\"cpu_cap\":{},\"ram_cap\":{},\"load_cap\":{},\
+         \"total_cap\":{},\"available\":{},\"ram_tight\":{}}}",
+        env!("CARGO_PKG_VERSION"),
+        b.snap.threads,
+        b.snap.mem_available_mb,
+        // O load é fracionário e vai como NÚMERO, com duas casas: mandá-lo como string faria a
+        // janela parsear texto, e `0,75` contra `0.75` depende do idioma de quem formatou.
+        format_args!("{:.2}", b.snap.load1),
+        b.snap.running_claudes,
+        b.cpu_cap,
+        b.ram_cap,
+        b.load_cap,
+        b.total_cap,
+        b.available,
+        b.ram_tight
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

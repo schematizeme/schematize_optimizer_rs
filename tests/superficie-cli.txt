@@ -1,5 +1,8 @@
 CMD schematize-optimizer
   SOBRE schematize optimizer — measures the dev environment and caps each software
+CMD schematize-optimizer agentes
+  SOBRE How many Claude agents this machine can run in PARALLEL without choking
+  ARG json                 --json
 CMD schematize-optimizer desktop
   SOBRE Icon and application-menu entry — so the app opens without schematize
   ARG install              --install
@@ -8,6 +11,22 @@ CMD schematize-optimizer diag
   SOBRE Measure the machine and say what can be improved. Changes NOTHING. This is what the icon opens
   ARG json                 --json
   ARG wait                 --wait
+CMD schematize-optimizer disco
+  SOBRE What is filling the disk and can be rebuilt: build artifacts, toolchain caches, Docker
+  ARG dirs                 --dir
+  ARG json                 --json
+  ARG min_dias             --min-dias
+CMD schematize-optimizer disco-clean
+  SOBRE Delete the rebuildable artifacts that match the filters. Shows the list FIRST
+  ARG dirs                 --dir
+  ARG min_dias             --min-dias
+  ARG montagem             --montagem
+  ARG tipo                 --tipo
+  ARG yes                  --yes -y
+CMD schematize-optimizer disco-docker
+  SOBRE Docker usage and prunes
+  ARG podar                --podar
+  ARG yes                  --yes -y
 CMD schematize-optimizer limits
   SOBRE Per-software resource ceilings (build, browser, container), via systemd slices
   ARG apply                --apply

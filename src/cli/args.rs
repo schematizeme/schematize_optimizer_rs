@@ -60,6 +60,58 @@ pub(crate) enum Cmd {
         #[arg(long)]
         json: bool,
     },
+    /// What is filling the disk and can be rebuilt: build artifacts, toolchain caches, Docker.
+    ///
+    /// Grouped BY DISK, because the real question is "what is filling THIS disk" — a total
+    /// across mount points answers nothing when only one of them is full.
+    Disco {
+        /// Only what has been untouched for at least N days.
+        #[arg(long, default_value_t = 0)]
+        min_dias: u64,
+        /// Scan this directory instead of the registered dev dirs. Repeatable.
+        #[arg(long = "dir")]
+        dirs: Vec<String>,
+        /// Machine-readable output. Stable keys, never translated.
+        #[arg(long)]
+        json: bool,
+    },
+    /// Delete the rebuildable artifacts that match the filters. Shows the list FIRST.
+    ///
+    /// **This is the destructive one, and it stays in the terminal on purpose** (D6): progress,
+    /// `Ctrl-C` and a copyable error come from a real terminal. The window builds the command
+    /// and opens one — it never deletes anything itself.
+    DiscoClean {
+        #[arg(long, default_value_t = 30)]
+        min_dias: u64,
+        #[arg(long = "dir")]
+        dirs: Vec<String>,
+        /// Filter by type slug (e.g. "rust-target", "node-modules", "cache").
+        #[arg(long)]
+        tipo: Option<String>,
+        /// Only on this disk (mount point, e.g. "/" or "/home").
+        #[arg(long)]
+        montagem: Option<String>,
+        /// Do not ask. Never applies to Docker volume pruning — that one always asks.
+        #[arg(long, short = 'y')]
+        yes: bool,
+    },
+    /// Docker usage and prunes.
+    DiscoDocker {
+        /// Run a prune by label. Without it, only lists.
+        #[arg(long)]
+        podar: Option<String>,
+        #[arg(long, short = 'y')]
+        yes: bool,
+    },
+    /// How many Claude agents this machine can run in PARALLEL without choking.
+    ///
+    /// Counts the `claude` processes ALREADY running, because the budget is of the machine and
+    /// not of one invocation.
+    Agentes {
+        /// Machine-readable output. Stable keys, never translated.
+        #[arg(long)]
+        json: bool,
+    },
     /// Icon and application-menu entry — so the app opens without schematize.
     Desktop {
         /// Install (the default when no flag is given).
