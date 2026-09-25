@@ -38,7 +38,7 @@ jobs:
           gh release view "${GITHUB_REF_NAME}" >/dev/null 2>&1 \
             || gh release create "${GITHUB_REF_NAME}" \
                  --title "${GITHUB_REF_NAME}" \
-                 --notes "schematize deployer ${GITHUB_REF_NAME} — diagnóstico da máquina e tetos por software."
+                 --notes "schematize optimizer ${GITHUB_REF_NAME} — diagnóstico da máquina e tetos por software."
 
   binarios:
     needs: criar

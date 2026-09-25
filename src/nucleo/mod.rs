@@ -13,4 +13,5 @@ pub mod bin;
 pub mod desktop;
 pub mod i18n;
 pub mod icone;
+pub mod procedencia;
 pub mod util;

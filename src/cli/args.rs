@@ -14,7 +14,10 @@ use clap::{Parser, Subcommand};
 #[derive(Parser)]
 #[command(
     name = "schematize-optimizer",
-    version,
+    // `version = <fn>` e nao `version` puro: o numero sozinho nao distingue dois
+    // binarios com o mesmo `Cargo.toml` e comportamento diferente — foi assim que um
+    // binario de 15 dias atras passou por novo e gravou o `.desktop` errado.
+    version = optimizer::nucleo::procedencia::rotulo_versao(),
     about = "schematize optimizer — measures the dev environment and caps each software",
     long_about = "Suggests by default. Only changes what it knows how to undo, and `--revert` undoes it.\n\
                   Works standalone; integrates with schematize when both are present."
