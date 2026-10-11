@@ -189,6 +189,20 @@ pub fn now_unix() -> u64 {
         .unwrap_or(0)
 }
 
+/// Variável que FIXA o "agora" de [`agora_unix`] (segundos desde a época). Só para teste.
+pub const ENV_AGORA: &str = "OPTIMIZER_AGORA_UNIX";
+
+/// **O quê:** o "agora" (segundos desde a época) para cálculos RELATIVOS ao relógio, como os
+/// dias parados de um artefato. Se `OPTIMIZER_AGORA_UNIX` tem um inteiro válido, devolve ele.
+///
+/// **Onde:** `disco::dias_desde_modificacao`. Existe para o teste de contrato do `--json`
+/// poder congelar o relógio: sem isso, duas execuções cruzando a meia-noite dão `dias_parado`
+/// diferente. Valor ausente ou inválido cai no relógio real (nunca falha). Não use para
+/// timestamps gravados — é só para medir idade.
+pub fn agora_unix() -> u64 {
+    std::env::var(ENV_AGORA).ok().and_then(|v| v.trim().parse().ok()).unwrap_or_else(now_unix)
+}
+
 /// Compara duas versões semver de forma SIMPLES (split por `.`), sem crate: `a < b`?
 /// O quê: quebra cada versão em números por `.`, ignora sufixos não-numéricos (ex.: `1.2.0-rc`
 /// vira 1,2,0), completa com zeros o mais curto e compara campo a campo. Onde: usado por

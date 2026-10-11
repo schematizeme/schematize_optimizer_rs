@@ -52,13 +52,21 @@ fn bin() -> std::path::PathBuf {
 /// muda de resultado conforme o `LANG` de quem o executa não prova nada — e o bug que este
 /// arquivo trava é exatamente sobre idioma.
 fn rodar(sub: &[&str], lang: &str) -> String {
+    rodar_com(sub, &[], lang, &[])
+}
+
+/// **O quê:** como [`rodar`], com argumentos extras (antes do `--json`) e variáveis de ambiente
+/// extras (depois da limpeza de idioma). **Onde:** [`rodar`] e os testes herméticos do `disco`.
+fn rodar_com(sub: &[&str], args: &[&str], lang: &str, envs: &[(&str, &str)]) -> String {
     let mut c = Command::new(bin());
     for v in ["OPTIMIZER_LANG", "SCHEMATIZE_LANG", "LC_ALL", "LC_MESSAGES", "LANG", "LANGUAGE"] {
         c.env_remove(v);
     }
     let out = c
         .args(sub)
+        .args(args)
         .arg("--json")
+        .envs(envs.iter().copied())
         .env("LANG", lang)
         .output()
         .unwrap_or_else(|e| panic!("não consegui executar {}: {e}", bin().display()));
@@ -259,6 +267,12 @@ const SUBCOMANDOS: &[&[&str]] = &[&["diag"], &["limits"], &["services"], &["disc
 
 /// Os subcomandos cujo documento é ESTÁVEL entre duas invocações seguidas.
 ///
+/// **O `disco` também fica de fora daqui, pelo motivo oposto ao do `agentes`:** ele mede o disco
+/// REAL (HOME, caches de toolchain, docker) e carrega `dias_parado`, uma idade contra o relógio.
+/// Duas execuções cruzando a virada do dia davam 32 -> 33 e reprovavam o teste (flaky). Ele tem
+/// o teste próprio [`disco_json_e_byte_a_byte_igual_em_qualquer_idioma`], sobre uma árvore
+/// fabricada e um relógio fixo.
+///
 /// **O `agentes` fica de fora, e não é omissão:** ele carrega `load1` e `running_claudes`, que
 /// mudam ENTRE UMA CHAMADA E OUTRA por definição — o load average é uma média móvel. Compará-lo
 /// byte a byte é um teste que passa sozinho e falha na suíte cheia, que é a definição de flaky.
@@ -267,7 +281,7 @@ const SUBCOMANDOS: &[&[&str]] = &[&["diag"], &["limits"], &["services"], &["disc
 /// **A regra que o `agentes` tem de cumprir está em `o_agentes_nao_tem_prosa_para_traduzir`**, e
 /// é mais forte que igualdade de bytes: o documento não tem NENHUMA string traduzível, então não
 /// há o que mudar com o idioma.
-const SUBCOMANDOS_ESTAVEIS: &[&[&str]] = &[&["diag"], &["limits"], &["services"], &["disco"]];
+const SUBCOMANDOS_ESTAVEIS: &[&[&str]] = &[&["diag"], &["limits"], &["services"]];
 
 /// **O BUG QUE ESTE ARQUIVO TRAVA.** O documento é o mesmo em qualquer idioma — byte a byte.
 ///
@@ -288,6 +302,86 @@ fn os_json_sao_byte_a_byte_iguais_em_qualquer_idioma() {
             );
         }
     }
+}
+
+/// "Agora" fixo do teste hermético do `disco` (segundos desde a época; 2027-01-15).
+const AGORA: u64 = 1_800_000_000;
+
+/// **O quê:** fabrica, em `CARGO_TARGET_TMPDIR`, a árvore que o `disco` vai varrer: um `HOME`
+/// vazio, um `PATH` vazio (sem `docker` nem `go`, logo nada do mundo real entra) e um projeto
+/// com `target/` de 51 MiB (acima do corte de 50 MiB) cujo mtime é `AGORA - dias` dias.
+///
+/// **Onde:** os dois testes do `disco`. Devolve `(raiz, dev_dir)`; recria do zero a cada chamada.
+fn fabrica_arvore(nome: &str, dias: u64) -> (std::path::PathBuf, std::path::PathBuf) {
+    use std::time::{Duration, UNIX_EPOCH};
+    let raiz = std::path::Path::new(env!("CARGO_TARGET_TMPDIR")).join(nome);
+    let _ = std::fs::remove_dir_all(&raiz);
+    let alvo = raiz.join("dev/proj/target");
+    for d in [raiz.join("home"), raiz.join("bin"), alvo.clone()] {
+        std::fs::create_dir_all(d).expect("cria a árvore de teste");
+    }
+    std::fs::write(alvo.join("lixo.bin"), vec![1u8; 51 * 1024 * 1024]).expect("grava o artefato");
+    let mtime = UNIX_EPOCH + Duration::from_secs(AGORA - dias * 86_400);
+    std::fs::File::open(&alvo)
+        .and_then(|f| f.set_modified(mtime))
+        .expect("fixa o mtime do artefato");
+    (raiz.clone(), raiz.join("dev"))
+}
+
+/// **O quê:** roda `disco --json` sobre a árvore fabricada, no idioma `lang` e com o relógio em
+/// `agora`. **Onde:** os dois testes do `disco`.
+fn rodar_disco(raiz: &std::path::Path, dev: &std::path::Path, lang: &str, agora: u64) -> String {
+    let home = raiz.join("home");
+    let path = raiz.join("bin");
+    let agora = agora.to_string();
+    rodar_com(
+        &["disco"],
+        &["--dir", &dev.to_string_lossy()],
+        lang,
+        &[
+            ("HOME", &home.to_string_lossy()),
+            ("PATH", &path.to_string_lossy()),
+            ("OPTIMIZER_AGORA_UNIX", &agora),
+        ],
+    )
+}
+
+/// **O contrato do `disco`: byte a byte igual em qualquer idioma — sobre entrada FIXA.**
+///
+/// Árvore fabricada + relógio fixo: nada da máquina de quem roda a suíte entra, então só uma
+/// prosa traduzida vazando para o documento pode fazê-lo mudar. Substitui a comparação sobre o
+/// disco real, que reprovava na virada do dia (`dias_parado` 32 -> 33).
+#[test]
+fn disco_json_e_byte_a_byte_igual_em_qualquer_idioma() {
+    let (raiz, dev) = fabrica_arvore("disco_idiomas", 32);
+    let referencia = rodar_disco(&raiz, &dev, IDIOMAS[0], AGORA);
+    // O documento tem de ter CONTEÚDO (um teste que compara dois `[]` está cego).
+    assert!(
+        referencia.contains("\"dias_parado\":32"),
+        "fixture sem o achado esperado: {referencia}"
+    );
+    assert!(referencia.contains("\"tipo\":\"rust-target\""), "tipo é slug: {referencia}");
+    for lang in &IDIOMAS[1..] {
+        assert_eq!(
+            referencia,
+            rodar_disco(&raiz, &dev, lang, AGORA),
+            "`disco --json` mudou entre {} e {lang} — prosa traduzida vazou para o contrato",
+            IDIOMAS[0]
+        );
+    }
+}
+
+/// **Self-check do anterior:** o teste não está cego. Com o relógio um dia adiante o documento
+/// MUDA (`dias_parado` 32 -> 33) — é exatamente a virada de dia que causava o flaky, agora
+/// provocada de propósito e controlada. Se o relógio injetável parasse de valer, isto falha.
+#[test]
+fn disco_dias_parado_acompanha_o_relogio_injetado() {
+    let (raiz, dev) = fabrica_arvore("disco_relogio", 32);
+    let hoje = rodar_disco(&raiz, &dev, "en_US.UTF-8", AGORA);
+    let amanha = rodar_disco(&raiz, &dev, "en_US.UTF-8", AGORA + 86_400);
+    assert!(hoje.contains("\"dias_parado\":32"), "{hoje}");
+    assert!(amanha.contains("\"dias_parado\":33"), "{amanha}");
+    assert_ne!(hoje, amanha);
 }
 
 /// Os três documentos são JSON válido de verdade, e acabam onde dizem acabar.

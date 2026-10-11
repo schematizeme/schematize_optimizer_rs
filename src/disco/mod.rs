@@ -99,11 +99,16 @@ pub(crate) fn medir(
 }
 
 /// Dias desde a última modificação do diretório. 0 se não der pra ler.
+///
+/// **O "agora" vem de [`crate::nucleo::util::agora_unix`]**, e não de `SystemTime::now()` aqui:
+/// `dias_parado` é uma diferença contra o relógio, então o mesmo disco medido em dois instantes
+/// pode dar números diferentes (32 -> 33 na virada do dia) — o que tornava flaky o teste que
+/// compara o `--json` byte a byte entre idiomas. Com o relógio injetável, o teste fixa o "agora".
 fn dias_desde_modificacao(p: &Path) -> u64 {
     let Ok(md) = std::fs::metadata(p) else { return 0 };
     let Ok(m) = md.modified() else { return 0 };
-    let Ok(dur) = std::time::SystemTime::now().duration_since(m) else { return 0 };
-    dur.as_secs() / 86_400
+    let Ok(m) = m.duration_since(std::time::UNIX_EPOCH) else { return 0 };
+    crate::nucleo::util::agora_unix().saturating_sub(m.as_secs()) / 86_400
 }
 
 /// Inventário completo: artefatos dos projetos + caches globais.
