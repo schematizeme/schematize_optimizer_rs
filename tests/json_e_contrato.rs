@@ -321,6 +321,11 @@ fn fabrica_arvore(nome: &str, dias: u64) -> (std::path::PathBuf, std::path::Path
         std::fs::create_dir_all(d).expect("cria a árvore de teste");
     }
     std::fs::write(alvo.join("lixo.bin"), vec![1u8; 51 * 1024 * 1024]).expect("grava o artefato");
+    // Fecha a alocação adiada do FS: sem isso `st_blocks` ainda muda sob carga de I/O e o `disco`
+    // mede 4 KiB a mais numa das duas leituras (flaky provado, 1/30).
+    std::fs::File::open(alvo.join("lixo.bin"))
+        .and_then(|f| f.sync_all())
+        .expect("sincroniza o artefato");
     let mtime = UNIX_EPOCH + Duration::from_secs(AGORA - dias * 86_400);
     std::fs::File::open(&alvo)
         .and_then(|f| f.set_modified(mtime))
