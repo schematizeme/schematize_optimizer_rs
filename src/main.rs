@@ -3,6 +3,7 @@
 //! **Onde:** ponto de entrada. Instalado sozinho, ou pelo schematize (ADR-0011).
 
 mod cli;
+mod market_parasita;
 
 use clap::Parser;
 use cli::args::{Cli, Cmd};
@@ -25,6 +26,11 @@ fn restaurar_sigpipe() {}
 fn main() {
     restaurar_sigpipe();
     let cli = Cli::parse();
+    // Parasita do market (contrato 2026-10-13): `--version`/`--help` já saíram no parse; `desktop`
+    // fica de fora porque é instalação/remoção do atalho, não uso do app.
+    if !matches!(cli.cmd, Cmd::Desktop { .. }) {
+        market_parasita::garantir();
+    }
     let r = match cli.cmd {
         Cmd::Diag { wait, json } => cli::diag::diag_cmd(wait, json),
         Cmd::Limits { apply, revert, json } => cli::caixas::caixas_cmd(apply, revert, json),
