@@ -33,5 +33,6 @@ pub mod agentes;
 pub mod caixas;
 pub mod diag;
 pub mod disco;
+pub mod jaula;
 pub mod nucleo;
 pub mod servicos;
