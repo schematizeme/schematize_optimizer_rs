@@ -333,6 +333,58 @@ pub(crate) fn agentes(b: &optimizer::agentes::Budget) -> String {
     )
 }
 
+/// **O quê:** o `jaula estimar --json`: uma entrada por tipo, sem prosa.
+/// **Onde:** `jaula estimar --json`.
+pub(crate) fn jaula_estimar(linhas: &[optimizer::jaula::LinhaEstimativa]) -> String {
+    let itens: Vec<String> = linhas
+        .iter()
+        .map(|l| {
+            format!(
+                "{{\"type\":\"{}\",\"class\":\"{}\",\"mem_max_mib\":{},\
+                 \"mem_high_mib\":{},\"jobs\":{}}}",
+                l.tipo, l.classe, l.mem_max_mib, l.mem_high_mib, l.jobs
+            )
+        })
+        .collect();
+    format!("{{\"optimizer\":\"{}\",\"types\":[{}]}}", env!("CARGO_PKG_VERSION"), itens.join(","))
+}
+
+/// **O quê:** o `jaula rodar --json`: veredito em slug + números; a mensagem humana NÃO viaja.
+/// **Onde:** `jaula rodar --json`. `peak_mib` é `null` quando não foi possível medir.
+pub(crate) fn jaula_rodar(d: &optimizer::jaula::Desfecho, nome: &str, backend: &str) -> String {
+    format!(
+        "{{\"optimizer\":\"{}\",\"name\":\"{}\",\"backend\":\"{}\",\"status\":\"{}\",\
+         \"exit_code\":{},\"ceiling_mib\":{},\"peak_mib\":{}}}",
+        env!("CARGO_PKG_VERSION"),
+        esc(nome),
+        backend,
+        d.status,
+        d.codigo,
+        d.teto_mib,
+        opt_n(d.pico_mib)
+    )
+}
+
+/// **O quê:** o `jaula diag --json`: backend, fatos crus e o que falta (slugs fechados).
+/// **Onde:** `jaula diag --json`.
+pub(crate) fn jaula_diag(backend: &str, f: &optimizer::jaula::Fatos) -> String {
+    let faltam: Vec<String> =
+        optimizer::jaula::faltas(f).iter().map(|s| format!("\"{s}\"")).collect();
+    format!(
+        "{{\"optimizer\":\"{}\",\"backend\":\"{}\",\"cgroup_v2\":{},\
+         \"memory_controller\":{},\"systemd_run\":{},\"user_session\":{},\"prlimit\":{},\
+         \"missing\":[{}]}}",
+        env!("CARGO_PKG_VERSION"),
+        backend,
+        f.cgroup_v2,
+        f.controller_memory,
+        f.systemd_run,
+        f.bus_usuario,
+        f.prlimit,
+        faltam.join(",")
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

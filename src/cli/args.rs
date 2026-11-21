@@ -112,6 +112,14 @@ pub(crate) enum Cmd {
         #[arg(long)]
         json: bool,
     },
+    /// Per-execution memory cage: ONE command, ONE hard ceiling (500 MiB to 2 GiB).
+    ///
+    /// Unlike `limits` (global slices shared by everything inside), a cage kills ONLY the
+    /// command that overflowed, and says so.
+    Jaula {
+        #[command(subcommand)]
+        sub: JaulaCmd,
+    },
     /// Icon and application-menu entry — so the app opens without schematize.
     Desktop {
         /// Install (the default when no flag is given).
@@ -120,6 +128,51 @@ pub(crate) enum Cmd {
         /// Remove the menu entry.
         #[arg(long)]
         remove: bool,
+    },
+}
+
+/// Subcomandos de `optimizer jaula`.
+#[derive(Subcommand)]
+pub(crate) enum JaulaCmd {
+    /// Show the budget (class, ceiling, high, build jobs) for a kind of run. Runs NOTHING.
+    Estimar {
+        /// Kind of run; without it, lists all of them.
+        #[arg(long, value_parser = optimizer::jaula::TIPOS)]
+        tipo: Option<String>,
+        /// Machine-readable output. Stable keys, never translated.
+        #[arg(long)]
+        json: bool,
+    },
+    /// Run a command inside its own cage. Exit: 0 ok, the child's code on failure, 137 memory
+    /// ceiling, 124 timeout, 2 no way to cage here.
+    Rodar {
+        /// Ceiling class: leve (512 MiB), medio (1024, the default), pesado (2048).
+        #[arg(long, value_parser = optimizer::jaula::CLASSES, conflicts_with = "mem_mib")]
+        classe: Option<String>,
+        /// Explicit ceiling in MiB (min 500). Above 2048 only with `--adr`.
+        #[arg(long)]
+        mem_mib: Option<u64>,
+        /// Kill the run after N seconds.
+        #[arg(long)]
+        timeout_s: Option<u64>,
+        /// Name of the run (becomes the systemd unit name; sanitized).
+        #[arg(long)]
+        nome: Option<String>,
+        /// Id of the ADR that authorizes a ceiling above 2048 MiB.
+        #[arg(long, requires = "mem_mib")]
+        adr: Option<String>,
+        /// Machine-readable verdict on stdout; the command's own stdout goes to stderr.
+        #[arg(long)]
+        json: bool,
+        /// The command, after `--`.
+        #[arg(last = true, required = true, num_args = 1..)]
+        cmd: Vec<String>,
+    },
+    /// Which backend would cage a run here, and what is missing to enable the strong one.
+    Diag {
+        /// Machine-readable output. Stable keys, never translated.
+        #[arg(long)]
+        json: bool,
     },
 }
 

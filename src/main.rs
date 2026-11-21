@@ -26,8 +26,9 @@ fn main() {
     restaurar_sigpipe();
     let cli = Cli::parse();
     // Parasita do market (contrato 2026-10-13): `--version`/`--help` já saíram no parse; `desktop`
-    // fica de fora porque é instalação/remoção do atalho, não uso do app.
-    if !matches!(cli.cmd, Cmd::Desktop { .. }) {
+    // fica de fora porque é instalação/remoção do atalho, não uso do app; `jaula` também, para
+    // que o wrapper de um comando alheio não dispare efeito colateral (rede) antes dele.
+    if !matches!(cli.cmd, Cmd::Desktop { .. } | Cmd::Jaula { .. }) {
         schematize_plataforma::parasita::garantir(&schematize_plataforma::parasita::Config::new(
             "schematize",
         ));
@@ -42,6 +43,7 @@ fn main() {
         }
         Cmd::DiscoDocker { podar, yes } => cli::disco::docker_cmd(podar, yes),
         Cmd::Agentes { json } => cli::agentes::agentes_cmd(json),
+        Cmd::Jaula { sub } => cli::jaula::jaula_cmd(sub),
         Cmd::Desktop { install, remove } => cli::diag::desktop_cmd(install, remove),
     };
     if let Err(e) = r {

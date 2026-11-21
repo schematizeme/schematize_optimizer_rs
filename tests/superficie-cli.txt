@@ -27,6 +27,24 @@ CMD schematize-optimizer disco-docker
   SOBRE Docker usage and prunes
   ARG podar                --podar
   ARG yes                  --yes -y
+CMD schematize-optimizer jaula
+  SOBRE Per-execution memory cage: ONE command, ONE hard ceiling (500 MiB to 2 GiB)
+CMD schematize-optimizer jaula diag
+  SOBRE Which backend would cage a run here, and what is missing to enable the strong one
+  ARG json                 --json
+CMD schematize-optimizer jaula estimar
+  SOBRE Show the budget (class, ceiling, high, build jobs) for a kind of run. Runs NOTHING
+  ARG json                 --json
+  ARG tipo                 --tipo
+CMD schematize-optimizer jaula rodar
+  SOBRE Run a command inside its own cage. Exit: 0 ok, the child's code on failure, 137 memory ceiling, 124 timeout, 2 no way to cage here
+  ARG adr                  --adr
+  ARG classe               --classe
+  ARG cmd                   <valor> OBRIGATORIO
+  ARG json                 --json
+  ARG mem_mib              --mem-mib
+  ARG nome                 --nome
+  ARG timeout_s            --timeout-s
 CMD schematize-optimizer limits
   SOBRE Per-software resource ceilings (build, browser, container), via systemd slices
   ARG apply                --apply
