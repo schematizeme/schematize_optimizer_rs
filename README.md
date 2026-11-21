@@ -60,6 +60,39 @@ Os tetos valem para o que for **iniciado dentro** do slice:
 systemd-run --user --slice=dev-build.slice --scope cargo build
 ```
 
+## Jaulas: um teto por execução
+
+As caixas acima são slices **globais**: um teto compartilhado por tudo o que roda dentro do
+slice. Se um comando estoura, o OOM escolhe uma vítima entre todos e leva a operação inteira.
+A **jaula** é o oposto, **descentralizada**: cada comando roda no próprio cgroup, com teto duro
+de 500 MiB a 2 GiB, e estourar mata **só ele**, com veredito claro.
+
+```sh
+optimizer jaula estimar [--tipo agente|script|tool|teste|build|navegador]   # puro, não executa
+optimizer jaula rodar [--classe leve|medio|pesado | --mem-mib N] [--timeout-s N] \
+                      [--nome X] [--json] -- <comando...>
+optimizer jaula diag                                  # backend + o que falta para ativar
+```
+
+| saída de `jaula rodar` | significa |
+|---|---|
+| `0` | concluiu |
+| código do filho | o comando falhou sozinho |
+| `137` | **reservado**: passou do teto de memória e foi encerrado; o resto da máquina não foi tocado |
+| `124` | passou do `--timeout-s` |
+| `2` | sem como impor teto aqui: **nada foi executado** (veja `jaula diag`) |
+
+`--mem-mib` acima de 2048 só com `--adr <id>`; sem ele o pedido é recusado com a explicação.
+Com `--json` o stdout é só o veredito (`status`, `exit_code`, `ceiling_mib`, `peak_mib`) e o
+stdout do comando vai para o stderr.
+
+**Por que `MemoryHigh` sozinho trava sem swap.** `MemoryHigh` só faz *throttle*: sem swap, a
+memória anônima não tem para onde ir, o processo fica engasgado acima do limiar e o OOM nunca
+chega, então a execução (e a máquina junto) trava em vez de morrer. A jaula usa `MemoryMax`
+(corte duro) + `MemorySwapMax=0`, e a lib `schematize_plataforma` (feature `jaula`) mata a
+unidade que encalha no high. Sem systemd scope com o controller `memory` delegado, o fallback é
+`prlimit` (mais fraco, sem prova de OOM); sem nenhum dos dois, nada roda sem teto.
+
 ## Estado
 
 | fase | | |
